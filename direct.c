@@ -3,11 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-
-int sizedir(char* address);
-int sizedir_in_dir(char* address); // Я сделал новую функцию. Она почти не отличается от придыдущей,
-                                   // но она не выводит размер каждого файла, а суммирует его
-                                   // и выводи размер всей дирректории
+int print_size_all(char* address);
+int sizefile(char* addfile);
+int sizedir(char* addressdir);
 
 int main(int argc, char* argv[])
 {
@@ -15,77 +13,16 @@ int main(int argc, char* argv[])
     {
         argv[1] = "./";
     }
-    char* adddir = strdup(argv[1]);
 
-    if (sizedir(adddir) == -1)
+    if (print_size_all(argv[1]) == -1)
     {
-        perror("Error");
         return 1;
     }
-    free(adddir);
+
 return 0;
 }
 
-int sizedir(char* address)
-{
-    DIR *direct = opendir(address); 
-    if(direct == NULL) 
-    {
-        return -1;
-    }
-    struct dirent *entry;
-    long size = 0;
-    
-    while((entry = readdir(direct)) != NULL)
-    {
-        size = 0;
-        char* addfile = strdup(address); // Чтобы не испортить адрес до директрии.
-        char* noopen1 = ".";
-        char* noopen2 = "..";
-        char* namefile = strdup(entry->d_name); 
-        if (!strcmp(namefile, noopen1) || !strcmp(namefile, noopen2))
-        {
-            continue;
-        }
-
-        strcat(addfile, namefile);
-        if (entry->d_type == DT_DIR) // Так я проверяю директроия это или файл.
-        {
-            strcat(addfile, "/"); // Формирую корректный адрес
-            int sizedirect = sizedir_in_dir(addfile);
-            if (sizedirect == -1)
-            {
-                // free(namefile);  
-                free(addfile);
-                return -1;
-            }
-            printf("%f k.b  %s\n", (double)((double)sizedirect/8)/1024, namefile);
-
-            continue;
-        }
-
-        
-        FILE* file = fopen(addfile, "r"); 
-        if (file == NULL)
-        {
-            perror("Ошибка доступа\n");
-            // free(namefile);
-            free(addfile);
-            continue;
-        }
-
-        fseek(file, 0, SEEK_END);
-        size = ftell(file);
-        printf("%f k.b  %s\n", (double)((double)size/8)/1024, namefile);
-        fclose(file);
-        free(addfile);
-        // free(namefile);
-    }
-    closedir(direct);
-return 0;
-}
-
-int sizedir_in_dir(char* address)
+int print_size_all(char* address)
 {
     DIR *direct = opendir(address); 
     if(direct == NULL) 
@@ -94,49 +31,146 @@ int sizedir_in_dir(char* address)
     }
     struct dirent *entry;
     int size = 0;
-    
     while((entry = readdir(direct)) != NULL)
     {
-        char* addfile = strdup(address); // Чтобы не испортить адрес до директрии.
-        char* noopen1 = ".";
-        char* noopen2 = "..";
-        char* namefile = strdup(entry->d_name); 
-        if (!strcmp(namefile, noopen1) || !strcmp(namefile, noopen2))
+        // printf("%s\n", entry->d_name);
+        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, ".git"))
         {
             continue;
         }
 
-        strcat(addfile, namefile);
-
-        if (entry->d_type == DT_DIR) // Так я проверяю директроия это или файл.
+        char* addfile = calloc(strlen(address), sizeof(char));
+        if (addfile == NULL)
         {
-            strcat(addfile, "/"); // Формирую корректный адрес
-            int sizedirect = sizedir_in_dir(addfile);
-            if (sizedirect == -1)
-            {
-                // free(namefile);
+            return -1;
+        }
+        addfile = strcpy(addfile, address); // Чтобы не испортить адрес до директрии.
+
+        addfile = (char*)realloc(addfile, strlen(addfile) + strlen(entry->d_name));
+        if (addfile == NULL)
+        {
+            return -1;
+        }
+        strcat(addfile, entry->d_name);
+
+        if (entry->d_type == DT_REG)
+        {
+            size = sizefile(addfile);
+            if (size == -1)
+            {  
                 free(addfile);
                 return -1;
             }
-            size =+ sizedirect;
-            continue;
-        }
-
-        
-        FILE* file = fopen(addfile, "r"); 
-        if (file == NULL)
-        {
-            perror("Ошибка доступа\n");
-            // free(namefile);
+            printf("%f k.b  %s\n", (double)((double)size/8)/1024, entry->d_name);
             free(addfile);
+        }
+
+
+        if (entry->d_type == DT_DIR) 
+        {
+            addfile = (char*)realloc(addfile, 1);
+            if (addfile == NULL)
+            {
+                return -1;
+            }
+            strcat(addfile, "/"); // Формирую корректный адрес
+            
+            size = sizedir(addfile);
+            if (size == -1)
+            {  
+                free(addfile);
+                return -1;
+            }
+
+            printf("%f k.b  %s\n", (double)((double)size/8)/1024, entry->d_name);
+            free(addfile);
+        }
+
+    }
+    closedir(direct);
+return 0;
+}
+
+int sizefile(char* addfile)
+{
+    FILE* file = fopen(addfile, "r"); 
+    if (file == NULL)
+    {
+        perror("Ошибка доступа\n");
+        free(addfile);
+    return -1;
+    }
+
+    fseek(file, 0, SEEK_END);
+    int size = ftell(file);
+    fclose(file);
+return size;
+}
+
+int sizedir(char* addressdir)
+{
+    DIR *direct = opendir(addressdir); 
+    if(direct == NULL) 
+    {
+        return -1;
+    }
+    struct dirent *entry;
+    int size = 0;
+
+    while((entry = readdir(direct)) != NULL)
+    {
+        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+        {
             continue;
         }
 
-        fseek(file, 0, SEEK_END);
-        size += ftell(file);
-        fclose(file);
-        free(addfile);
-        // free(namefile);
+        char* addfile = calloc(strlen(addressdir), sizeof(char));
+        if (addfile == NULL)
+        {
+            return -1;
+        }
+        addfile = strcpy(addfile, addressdir); // Чтобы не испортить адрес до директрии.
+
+        addfile = (char*)realloc(addfile, strlen(addfile) + strlen(entry->d_name));
+        if (addfile == NULL)
+        {
+            return -1;
+        }
+        strcat(addfile, entry->d_name);
+
+        int sizef = 0;
+        if (entry->d_type == DT_REG)
+        {
+            int sizef = sizefile(addfile);
+            if (sizef == -1)
+            {  
+                free(addfile);
+                return -1;
+            }
+            size += sizef;
+            free(addfile);
+        }
+
+        if (entry->d_type == DT_DIR) 
+        {
+            addfile = (char*)realloc(addfile, 1);
+            if (addfile == NULL)
+            {
+                return -1;
+            }
+            strcat(addfile, "/"); // Формирую корректный адрес
+
+            sizef = sizedir(addfile);
+            if (sizef == -1)
+            {  
+                free(addfile);
+                return -1;
+            }
+
+            size += sizef;
+            free(addfile);
+        }
+
     }
     closedir(direct);
 return size;
