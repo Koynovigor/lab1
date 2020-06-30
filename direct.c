@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 return 0;
 }
 
-int print_size_all(char* address)
+int print_size_all(char* address) // Ф-ия выводит объём всех фалов и директроий в данной директории
 {
     DIR *direct = opendir(address); 
     if(direct == NULL) 
@@ -91,7 +91,7 @@ int print_size_all(char* address)
 return 0;
 }
 
-int sizefile(char* addfile)
+int sizefile(char* addfile) // Ф-ия считает объём файла
 {
     FILE* file = fopen(addfile, "r"); 
     if (file == NULL)
@@ -107,7 +107,7 @@ int sizefile(char* addfile)
 return size;
 }
 
-int sizedir(char* addressdir)
+int sizedir(char* addressdir) // Эта ф-ия очень похожа на первую, но тут считается объм всех файлов директории
 {
     DIR *direct = opendir(addressdir); 
     if(direct == NULL) 
@@ -119,7 +119,7 @@ int sizedir(char* addressdir)
 
     while((entry = readdir(direct)) != NULL)
     {
-        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, ".git"))
         {
             continue;
         }
